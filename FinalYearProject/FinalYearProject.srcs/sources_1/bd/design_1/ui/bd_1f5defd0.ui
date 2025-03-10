@@ -1,0 +1,21 @@
+{
+   "ActiveEmotionalView":"Default View",
+   "Default View_ScaleFactor":"0.785829",
+   "Default View_TopLeft":"-453,-547",
+   "ExpandedHierarchyInLayout":"",
+   "guistr":"# # String gsaved with Nlview 7.5.8 2022-09-21 7111 VDI=41 GEI=38 GUI=JA:10.0
+#  -string -flagsOSRD
+preplace inst zynq_ultra_ps_e_0 -pg 1 -lvl 1 -x 140 -y -100 -defaultsOSRD
+preplace inst axi_interconnect_0 -pg 1 -lvl 2 -x 620 -y -320 -defaultsOSRD
+preplace inst rst_ps8_0_100M -pg 1 -lvl 2 -x 620 -y -70 -defaultsOSRD
+preplace netloc zynq_ultra_ps_e_0_pl_clk0 1 1 1 440 -380n
+preplace netloc zynq_ultra_ps_e_0_pl_resetn0 1 1 1 N -90
+preplace netloc rst_ps8_0_100M_peripheral_aresetn 1 1 2 450 -460 790
+levelinfo -pg 1 -190 140 620 810
+pagesize -pg 1 -db -bbox -sgen -190 -560 810 180
+"
+}
+{
+   "da_clkrst_cnt":"1",
+   "da_zynq_ultra_ps_e_cnt":"1"
+}
