@@ -523,7 +523,7 @@ module DL1cache (clk, reset,cycles,
 	assign rdata_updated=(hitw)?wdata:rdata[hit_way];
 	reg full_line_write_miss;
 	// reg srrip;
-	reg found_candidate;
+	// reg found_candidate;
 
 
 
@@ -580,7 +580,7 @@ module DL1cache (clk, reset,cycles,
 			// 	// if (`DEB) 
 			// 	$display("Access");
 			// end
-			// srrip = 0; 
+			
 			// First, check if the access hits in cache
 			for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
 				if (access && (tag_array[set][j_] == tag) && valid[set][j_]) begin
@@ -620,30 +620,41 @@ module DL1cache (clk, reset,cycles,
 
 
 			if (!hit) begin
-				// while (srrip == 0) begin    
-					// zero_found = 0;  // Reset zero_found before checking
-					found_candidate = 0; // Flag for exiting the loop
-
-					// 🔹 Check for an RRPV of '3' (2'b11)
+				integer found_candidate;
+				integer increment_count;
+				
+				// Initialize variables
+				found_candidate = 0;
+				candidate = 0;
+				increment_count = 0;
+				
+				// We'll use a for loop that can increment RRPVs up to `DL1ways` times
+				// (worst case: we need to increment all blocks from 0 to 3)
+				for (increment_count = 0; increment_count < `DL1ways && !found_candidate; increment_count = increment_count + 1) begin
+					// Search for a block with RRPV = 3
 					for (j_ = 0; j_ < `DL1ways && !found_candidate; j_ = j_ + 1) begin
-						if (srrip_state[set][j_] == 2'b11) begin
+						if (srrip_state[set][j_] == 2'b11) begin  // If RRPV == 3
 							candidate = j_;
-							zero_found = 1;
-							srrip_state[set][j_] = 2'b10;  // Set RRPV to '2'
-							// srrip = 1;  // Exit loop
-							// break;
-							found_candidate = 1; // Prevent further iterations
+							found_candidate = 1;  // Found a candidate
 						end
-					// end
-
-					// If no RRPV == '3' is found, increment all RRPVs
-					if (!zero_found) begin
+					end
+					
+					// If we didn't find a candidate and this isn't the last iteration,
+					// increment all RRPVs and try again
+					if (!found_candidate && increment_count < `DL1ways - 1) begin
 						for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
-							srrip_state[set][j_] = srrip_state[set][j_] + 1;
+							if (srrip_state[set][j_] < 2'b11) begin
+								srrip_state[set][j_] = srrip_state[set][j_] + 1;
+							end
 						end
 					end
 				end
+				
+				// After finding the candidate, set its RRPV to 2
+				srrip_state[set][candidate] = 2'b10;
 			end
+
+
 
 			// end
 			// for (j_=0;j_<`DL1ways;j_=j_+1) begin
@@ -994,8 +1005,8 @@ module DL2cache (clk, reset,
 	reg [`DL2waysLog2-1:0] flush_way;
 	assign doutB=rdata[(flushing&&!waiting)?flush_way:miss_way];
 	reg hitw_saved;	
-	reg srrip;
-	reg found_candidate;
+	// reg srrip;
+	// reg found_candidate;
 
 
 
@@ -1037,13 +1048,13 @@ module DL2cache (clk, reset,
 			
 			hit=0; miss=access; zero_found=0;
 
-			srrip = 0; 
+			// srrip = 0; 
 			for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
 				if (access && (tag_array[set][j_] == tag) && valid[set][j_]) begin
 					hit = 1;
 					candidate = j_;
 					miss = 0;
-					srrip = 1; // Exit replacement process
+					// srrip = 1; // Exit replacement process
 				end
 			end
 			
@@ -1054,28 +1065,38 @@ module DL2cache (clk, reset,
 			// 	nru_bit[set][candidate]<=1;
 			// end
 			if (!hit) begin
-				while (srrip == 0) begin    
-					zero_found = 0;  // Reset zero_found before checking
-					found_candidate = 0; // Flag for exiting the loop
-
-					// 🔹 Check for an RRPV of '3' (2'b11)
+				integer found_candidate;
+				integer increment_count;
+				
+				// Initialize variables
+				found_candidate = 0;
+				candidate = 0;
+				increment_count = 0;
+				
+				// We'll use a for loop that can increment RRPVs up to `DL1ways` times
+				// (worst case: we need to increment all blocks from 0 to 3)
+				for (increment_count = 0; increment_count < `DL1ways && !found_candidate; increment_count = increment_count + 1) begin
+					// Search for a block with RRPV = 3
 					for (j_ = 0; j_ < `DL1ways && !found_candidate; j_ = j_ + 1) begin
-						if (srrip_state[set][j_] == 2'b11) begin
+						if (srrip_state[set][j_] == 2'b11) begin  // If RRPV == 3
 							candidate = j_;
-							zero_found = 1;
-							srrip_state[set][j_] = 2'b10;  // Set RRPV to '2'
-							srrip = 1;  // Exit loop
-							found_candidate = 1; // Prevent further iterations
+							found_candidate = 1;  // Found a candidate
 						end
 					end
-
-					// 🔹 If no RRPV == '3' is found, increment all RRPVs
-					if (!zero_found) begin
+					
+					// If we didn't find a candidate and this isn't the last iteration,
+					// increment all RRPVs and try again
+					if (!found_candidate && increment_count < `DL1ways - 1) begin
 						for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
-							srrip_state[set][j_] = srrip_state[set][j_] + 1;
+							if (srrip_state[set][j_] < 2'b11) begin
+								srrip_state[set][j_] = srrip_state[set][j_] + 1;
+							end
 						end
 					end
 				end
+				
+				// After finding the candidate, set its RRPV to 2
+				srrip_state[set][candidate] = 2'b10;
 			end
 			
 			if (hit) begin

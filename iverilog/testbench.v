@@ -25,10 +25,17 @@
 `define StackPointer 32'h0ffffff0
 
 // Use the StartAddress to set the start address of the binary
-`define StartAddress 32'h00010584
-
 // Use BINARY to set the path of the binary for simulation
-`define BINARY "stream.bin"
+
+// stream.bin
+// `define BINARY "stream.bin"
+// `define StartAddress 32'h00010584 // stream.bin
+
+`define BINARY "firmware_sort.bin"
+`define StartAddress 32'h00010620
+
+
+
 
 `include "system.v"
 

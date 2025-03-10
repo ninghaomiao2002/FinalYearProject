@@ -26,9 +26,9 @@
 `define STDO 1 // Enables stdout in simulation
 
 `include "cpu.v"
-// `include "caches_nru.v"
+`include "caches_nru.v"
 // `include "caches_lru.v"
-`include "caches_srrip.v"
+// `include "caches_srrip.v"
 // `include "caches_random.v"
 `include "custom.v"
 
