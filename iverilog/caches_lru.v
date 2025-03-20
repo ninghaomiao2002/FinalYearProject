@@ -544,6 +544,8 @@ module DL1cache (clk, reset,cycles,
 	assign rdata_updated=(hitw)?wdata:rdata[hit_way];
 	reg full_line_write_miss;
 	reg [2:0] a;
+	reg [61:0] hit_count;
+	reg [61:0] access_count;
 
 
 
@@ -583,6 +585,7 @@ module DL1cache (clk, reset,cycles,
 			writeback<=0;	waiting<=0; waiting_en<=0; read_once<=0; baddr<=0;
 			
 			flush_out<=0; flushing<=0; full_line_write_miss<=0;
+			hit_count<=0; access_count<=0;
 		end else begin
 
 			we_local <=0; we_pending<=0; ready<=0;
@@ -596,10 +599,11 @@ module DL1cache (clk, reset,cycles,
 						
 			
 			hit=0; miss=access; zero_found=0;//candidate=0;
-			// if (access) begin
+			if (access) begin
+				access_count<=access_count+1;
 			// 	// if (`DEB) 
 			// 	$display("Access");
-			// end
+			end
 
 			for (j_=0;j_<`DL1ways;j_=j_+1) begin
 				if (access && ((tag_array[set][j_]==tag) && valid[set][j_])) begin
@@ -628,6 +632,9 @@ module DL1cache (clk, reset,cycles,
 
 
 			if (hit) begin
+				hit_count<=hit_count+1;
+				// hit_rate<=(hit_count*100)/access_count;
+				$display("L1 hit_count %d, access_count %d",hit_count, access_count);
 				// Mark the accessed way as most recently used
 				// $display("LRU Access hit %d in set %d way %d; Way %d, LRU %2b; way %d, LRU %2b; Way %d, LRU %2b; Way %d, LRU %2b", hit, set, candidate, 0, lru_state[set][0], 1, lru_state[set][1], 2, lru_state[set][2], 3, lru_state[set][3]);
 				
@@ -950,6 +957,8 @@ module DL2cache (clk, reset,
 	assign doutB=rdata[(flushing&&!waiting)?flush_way:miss_way];
 	reg hitw_saved;	
 	reg [2:0] a;
+	reg [61:0] hit_count;
+	reg [61:0] access_count;
 
 
 
@@ -972,6 +981,7 @@ module DL2cache (clk, reset,
 			
 			flush_out<=0; flushing<=0; read_once<=0; from_writeback<=0; 
 			read_strobe<=0; write_strobe<=0; doutBstrobe<=0;flush_way<=0;
+			hit_count<=0; access_count<=0;
 
 		end else begin
 
@@ -999,15 +1009,19 @@ module DL2cache (clk, reset,
 				end
 			end	
 			
-			// if (access) begin
+			if (access) begin
+			access_count<=access_count+1;
 			// 	if (`DEB)$display("L2 Access hit %d set %d", hit, set);
 			// 	if ((nru_bit[set] /*|(1<<candidate)*/)=={`DL2ways{1'b1}})
 			// 		nru_bit[set]<=0;
 			// 	nru_bit[set][candidate]<=1;
-			// end
+			end
 			
 			
 			if (hit) begin
+				hit_count<=hit_count+1;
+				// hit_rate<=(hit_count*100)/access_count;
+				$display("L2 hit_count %d, access_count %d",hit_count, access_count);
 				if (`DEB)$display("hit set %d tag %h way %h",set, tag, candidate);
 				
 				a = lru_state[set][candidate]; // Store before the loop

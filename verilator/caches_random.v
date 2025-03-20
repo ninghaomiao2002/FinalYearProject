@@ -523,6 +523,9 @@ module DL1cache (clk, reset,cycles,
 	
 	assign rdata_updated=(hitw)?wdata:rdata[hit_way];
 	reg full_line_write_miss;
+	reg [61:0] hit_count;
+	reg [61:0] access_count;
+	// reg [7:0] hit_rate;
 	
 	always @( posedge clk ) begin
 		if (reset) begin
@@ -539,6 +542,7 @@ module DL1cache (clk, reset,cycles,
 			writeback<=0;	waiting<=0; waiting_en<=0; read_once<=0; baddr<=0;
 			
 			flush_out<=0; flushing<=0; full_line_write_miss<=0;
+			hit_count<=0; access_count<=0;
 		end else begin
 
 			we_local <=0; we_pending<=0; ready<=0;
@@ -565,14 +569,17 @@ module DL1cache (clk, reset,cycles,
 				end
 			end	
 			
-			// if (access) begin
+			if (access) begin
+			access_count<=access_count+1;
 			// 	if (`DEB)$display("DL1 Access hit %d set %d", hit, set);
 			// 	if ((nru_bit[set] /*|(1<<candidate)*/)=={`DL1ways{1'b1}})
 			// 		nru_bit[set]<=0;
 			// 	nru_bit[set][candidate]<=1;//!(we=={(`VLEN/8){1'b1}});
-			// end
+			end
 			
 			if (hit) begin
+				hit_count<=hit_count+1;
+				$display("L1 hit_count %d, access_count %d",hit_count, access_count);
 				if (`DEB)$display("hit1 set %d tag %h way %h",set, tag, candidate);
 				// $display("Access hit %d in set %d way %d", hit, set, candidate);
 				if (en) ready<=1;
@@ -870,6 +877,9 @@ module DL2cache (clk, reset,
 	reg [`DL2waysLog2-1:0] flush_way;
 	assign doutB=rdata[(flushing&&!waiting)?flush_way:miss_way];
 	reg hitw_saved;	
+
+	reg [61:0] hit_count;
+	reg [61:0] access_count;
 	
 	always @( posedge clk ) begin
 		if (reset) begin
@@ -885,6 +895,7 @@ module DL2cache (clk, reset,
 			
 			flush_out<=0; flushing<=0; read_once<=0; from_writeback<=0; 
 			read_strobe<=0; write_strobe<=0; doutBstrobe<=0;flush_way<=0;
+			hit_count<=0; access_count<=0;
 
 		end else begin
 
@@ -911,15 +922,19 @@ module DL2cache (clk, reset,
 				end
 			end	
 			
-			// if (access) begin
+			if (access) begin
+				access_count<=access_count+1;
 			// 	if (`DEB)$display("L2 Access hit %d set %d", hit, set);
 			// 	if ((nru_bit[set] /*|(1<<candidate)*/)=={`DL2ways{1'b1}})
 			// 		nru_bit[set]<=0;
 			// 	nru_bit[set][candidate]<=1;
-			// end
+			end
 			
 			
 			if (hit) begin
+				hit_count<=hit_count+1;
+				// hit_rate<=(hit_count*100)/access_count;
+				$display("L2 hit_count %d, access_count %d",hit_count, access_count);
 				if (`DEB)$display("hit set %d tag %h way %h",set, tag, candidate);
 				if (en) ready<=1;
 

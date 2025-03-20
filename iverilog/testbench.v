@@ -28,11 +28,11 @@
 // Use BINARY to set the path of the binary for simulation
 
 // stream.bin
-// `define BINARY "stream.bin"
-// `define StartAddress 32'h00010584 // stream.bin
+`define BINARY "stream.bin"
+`define StartAddress 32'h00010584 // stream.bin
 
-`define BINARY "firmware_sort.bin"
-`define StartAddress 32'h00010620
+// `define BINARY "firmware_sort.bin"
+// `define StartAddress 32'h00010620
 
 
 
