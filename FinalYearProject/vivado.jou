@@ -1,0 +1,17 @@
+#-----------------------------------------------------------
+# Vivado v2023.2 (64-bit)
+# SW Build 4029153 on Fri Oct 13 20:14:34 MDT 2023
+# IP Build 4028589 on Sat Oct 14 00:45:43 MDT 2023
+# SharedData Build 4025554 on Tue Oct 10 17:18:54 MDT 2023
+# Start of session at: Mon Mar 10 19:42:57 2025
+# Process ID: 10908
+# Current directory: E:/FinalYearProject/FinalYearProject
+# Command line: vivado.exe -gui_launcher_event rodinguilauncherevent17320 E:\FinalYearProject\FinalYearProject\FinalYearProject.xpr
+# Log file: E:/FinalYearProject/FinalYearProject/vivado.log
+# Journal file: E:/FinalYearProject/FinalYearProject\vivado.jou
+# Running On: Desktop, OS: Windows, CPU Frequency: 2112 MHz, CPU Physical cores: 20, Host memory: 34009 MB
+#-----------------------------------------------------------
+start_gui
+open_project E:/FinalYearProject/FinalYearProject/FinalYearProject.xpr
+update_compile_order -fileset sources_1
+open_bd_design {E:/FinalYearProject/FinalYearProject/FinalYearProject.srcs/sources_1/bd/design_1/design_1.bd}
