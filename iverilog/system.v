@@ -31,8 +31,9 @@
 // `include "caches_srrip.v"
 // `include "caches_random.v"
 // `include "caches_new.v"
-`include "caches_hawkeye.v"
+// `include "caches_hawkeye.v"
 // `include "caches_drrip.v"
+`include "hawkeye.v"
 `include "custom.v"
 
 module System(clk, reset, StartAddress, StackPointer,      

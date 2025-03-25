@@ -1,171 +1,3 @@
-module crc32_hash (
-    input  wire [63:0] block_addr,
-    output reg  [63:0] crc_out
-);
-    reg [63:0] val;
-    integer i;
-    parameter [31:0] CRC_POLY = 32'hEDB88320;
-
-    always @(*) begin
-        val = block_addr;
-        for (i = 0; i < 32; i = i + 1) begin
-            if (val[0])
-                val = (val >> 1) ^ CRC_POLY;
-            else
-                val = val >> 1;
-        end
-        crc_out = val;
-    end
-endmodule
-
-module shct #(parameter SHCT_SIZE = 1024, parameter MAX_SHCT = 3)(
-    input wire clk,
-    input wire rst,
-    input wire [63:0] pc,
-    input wire increment,
-    input wire decrement,
-    output wire prediction
-);
-    reg [1:0] table [0:SHCT_SIZE-1]; // 2-bit saturating counters
-
-    wire [63:0] hashed_pc;
-    wire [$clog2(SHCT_SIZE)-1:0] index;
-
-    crc32_hash hasher(
-        .block_addr(pc),
-        .crc_out(hashed_pc)
-    );
-
-    assign index = hashed_pc % SHCT_SIZE;
-    assign prediction = (table[index] >= ((MAX_SHCT + 1) >> 1)) ? 1'b1 : 1'b0;
-
-    integer i;
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
-            for (i = 0; i < SHCT_SIZE; i = i + 1) begin
-                table[i] <= (MAX_SHCT + 1) >> 1;
-            end
-        end else begin
-            if (increment && table[index] < MAX_SHCT)
-                table[index] <= table[index] + 1;
-            else if (decrement && table[index] > 0)
-                table[index] <= table[index] - 1;
-        end
-    end
-endmodule
-
-module optgen #(parameter VECTOR_SIZE = 512, parameter CACHE_SIZE = 64)(
-    input wire clk,
-    input wire rst,
-    input wire add_access,
-    input wire add_prefetch,
-    input wire [8:0] curr_quanta,       // index into liveness_history
-    input wire [8:0] last_quanta,
-    output reg should_cache
-);
-    reg [9:0] liveness_history [0:VECTOR_SIZE-1];
-
-    integer i;
-    reg [8:0] idx;
-    reg cache_flag;
-
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
-            for (i = 0; i < VECTOR_SIZE; i = i + 1) begin
-                liveness_history[i] <= 0;
-            end
-            should_cache <= 1;
-        end else begin
-            if (add_access || add_prefetch) begin
-                liveness_history[curr_quanta] <= 0;
-            end
-
-            cache_flag = 1;
-            idx = last_quanta;
-            while (idx != curr_quanta) begin
-                if (liveness_history[idx] >= CACHE_SIZE) begin
-                    cache_flag = 0;
-                end
-                idx = (idx + 1) % VECTOR_SIZE;
-            end
-
-            if (cache_flag && last_quanta != curr_quanta) begin
-                idx = last_quanta;
-                while (idx != curr_quanta) begin
-                    liveness_history[idx] <= liveness_history[idx] + 1;
-                    idx = (idx + 1) % VECTOR_SIZE;
-                end
-            end
-
-            should_cache <= cache_flag;
-        end
-    end
-endmodule
-
-module hawkeye_top(
-    input wire clk,
-    input wire rst,
-    input wire [63:0] pc,
-    input wire valid_access,
-    input wire reuse_detected,
-    input wire [8:0] curr_quanta,
-    input wire [8:0] last_quanta,
-    input wire is_prefetch,
-    output wire predict_useful
-);
-    wire incr, decr;
-    wire should_cache_signal;
-
-    // Decision to increment/decrement SHCT based on OPTgen feedback
-    assign incr = valid_access && should_cache_signal;
-    assign decr = valid_access && !should_cache_signal;
-
-    shct shct_inst(
-        .clk(clk),
-        .rst(rst),
-        .pc(pc),
-        .increment(incr),
-        .decrement(decr),
-        .prediction(predict_useful)
-    );
-
-    optgen optgen_inst(
-        .clk(clk),
-        .rst(rst),
-        .add_access(valid_access && !is_prefetch),
-        .add_prefetch(valid_access && is_prefetch),
-        .curr_quanta(curr_quanta),
-        .last_quanta(last_quanta),
-        .should_cache(should_cache_signal)
-    );
-endmodule
-
-
-
-/*  Copyright 2021-2024 Philippos Papaphilippou
-
-	You are free to use, learn from, modify and distribute this creative work under 
-	  the following conditions:
-	1. No code, text, or other elements of this work can be used as an input to models
-	  for the purposes of training. Generative A.I. and language models are prohibited
-	  from using this work. These do not include search engines and related tools whose
-	  main purpose is to index and appropriately point to the original source and author.
-	2. It comes under no warranties.
-	3. Any modification to the code shall be made available in the style of GNU General
-	  Public License v2.0 (GPL-2.0), but published under the same license (not GPL-2.0,
-	  and clause 7 still refers to the original copyright holder).
-	4. A proper attribution of the author (copyright holder) is required when the work 
-	  is used. (If applicable, it would be appreciated to cite the related academic
-	  publication that introduced the work.)
-	5. It cannot be used for commercial purposes unless specific permission is given by
-	  the author. 
-	6. A redistribution shall include this license in its entirety.
-	7. The author has the right to change this license for future versions of this work,
-	  as well as to update and clarify the author's original intentions of the current
-	  version, such as with regard to what is considered "fair use" by the author for
-	  future entities and technologies.  
-*/
-
 // In powers of 2 above 1
 `define IL1sets 64
 
@@ -185,6 +17,13 @@ endmodule
 `define DL2waysLog2 $clog2(`DL2ways)
 `define DL2block_Log2 $clog2(`DL2block)
 `define DL2subblocks_Log2 $clog2(`DL2subblocks)
+
+`define VECTOR_SIZE 32
+`define OCC_WIDTH 4
+
+`define SHCT_SIZE 1024
+`define MAX_SHCT 7
+`define MID_SHCT 4
 
 
 // Implementation of the IL1 cache in registers
@@ -259,8 +98,110 @@ module IL1Cache (clk, reset, PC, instr, ready,
 	end
 endmodule
 
+module optgen 
+// #(
+    // parameter NUM_SETS = 64,DL1sets
+    // parameter VECTOR_SIZE = 32,
+    // parameter ASSOC = 16,`DL1ways              // set associativity
+    // parameter OCC_WIDTH = 4            // 4-bit occupancy counter
+// )
+(
+    input wire clk,
+    input wire reset,
 
-// Implementation of the DL1 cache in block ram
+    input wire [`DL1setsLog2-1:0] set,  // sampled set index (0-63)
+    input wire [4:0] curr_quanta,     // current time quantum (0-31)
+    input wire [4:0] last_quanta,     // reuse starts here
+    input wire is_reuse,              // true if reused, else first access
+
+    output reg should_cache          // output: true = Belady would cache
+);
+
+    // 64 occupancy vectors (1 per set), each of 32 entries
+    reg [`OCC_WIDTH-1:0] occupancy_vector [`DL1sets-1:0][`VECTOR_SIZE-1:0];
+
+    integer i;
+
+    // Initialization
+    integer s, q;
+    always @(posedge clk or posedge reset) begin
+        if (reset) begin
+            // Initialize all occupancy vectors to 0
+            for (s = 0; s < `DL1sets; s = s + 1)
+                for (q = 0; q < `VECTOR_SIZE; q = q + 1)
+                    occupancy_vector[s][q] <= 0;
+        end
+    end
+
+    // Compute "should_cache" (simulate OPT)
+    always @(*) begin
+        should_cache = 1;
+
+        if (is_reuse) begin
+            integer q_idx;
+            q_idx = last_quanta;
+            while (q_idx != curr_quanta) begin
+                if (occupancy_vector[set][q_idx] >= `DL1ways)
+                    should_cache = 0; // too many live intervals => not cached
+                q_idx = (q_idx + 1) % `VECTOR_SIZE;
+            end
+        end
+    end
+
+    // Update occupancy vector if should_cache == 1
+    always @(posedge clk) begin
+        if (is_reuse && should_cache && !reset) begin
+            integer q_idx;
+            q_idx = last_quanta;
+            while (q_idx != curr_quanta) begin
+                if (occupancy_vector[set][q_idx] < `DL1ways)
+                    occupancy_vector[set][q_idx] <= occupancy_vector[set][q_idx] + 1;
+                q_idx = (q_idx + 1) % `VECTOR_SIZE;
+            end
+        end
+    end
+
+endmodule
+
+
+module hawkeye_predictor (
+    input wire clk,
+    input wire reset,
+    input wire [63:0] pc,
+    input wire train_up,
+    input wire train_down,
+    output wire prediction
+);
+
+    logic [2:0] shct [0:`SHCT_SIZE-1];
+
+    function automatic [9:0] hash;
+        input [63:0] pc;
+        begin
+            hash = pc[9:0] ^ pc[19:10] ^ pc[29:20]; // simple XOR hash
+        end
+    endfunction
+
+    int i;
+    always @(posedge clk or posedge reset) begin
+        if (reset) begin
+            for (i = 0; i < `SHCT_SIZE; i++)
+                shct[i] <= `MID_SHCT;
+        end else begin
+            integer idx = hash(pc);
+            if (train_up && shct[idx] < `MAX_SHCT) begin
+                shct[idx] <= shct[idx] + 1;
+            end
+            else if (train_down && shct[idx] > 0) begin
+                shct[idx] <= shct[idx] - 1;
+            end
+        end
+    end
+
+    assign prediction = (shct[hash(pc)] >= `MID_SHCT);
+endmodule
+
+
 
 module DL1cache (clk, reset,cycles, 
 		addr, en, we, din, dout, dready, accepting, flush_in,
@@ -284,7 +225,6 @@ module DL1cache (clk, reset,cycles,
     input dreadyB;
     input acceptingB;
     output reg flush_out;
-
     
     (* ram_style = "block" *) reg [`VLEN-1:0] way [`DL1ways-1:0][`DL1sets-1:0] ;
     reg [`VLEN-1:0] rdata [`DL1ways-1:0];
@@ -293,7 +233,8 @@ module DL1cache (clk, reset,cycles,
 	reg [`DADDR_bits-(`VLEN_Log2-3)-`DL1setsLog2-1:0] tag_array [`DL1sets-1:0][`DL1ways-1:0];
     reg [`DL1ways-1:0] dirty [`DL1sets-1:0];
     reg [`DL1ways-1:0] valid [`DL1sets-1:0];
-    reg [`DL1ways-1:0] nru_bit [`DL1sets-1:0];
+    // reg [`DL1ways-1:0] nru_bit [`DL1sets-1:0];
+    reg [2:0] rrpv [`DL1sets-1:0][`DL1ways-1:0]; // 3-bit RRIP counters
 
     wire [`DADDR_bits-(`VLEN_Log2-3)-`DL1setsLog2-1:0] tag; 
     assign tag = addr>>(`DL1setsLog2+(`VLEN_Log2-3));
@@ -337,6 +278,43 @@ module DL1cache (clk, reset,cycles,
     
     reg zero_found;
 
+
+// Sampler data for occupancy vectors
+    reg [4:0] last_access_quanta [`DL1sets-1:0][64]; // Track last access time quantum
+    reg [4:0] curr_quanta; // Current time quantum (increments on accesses to sampled sets)
+    
+    // PC tracking for predictor
+    reg [63:0] last_pc [`DL1sets-1:0][`DL1ways-1:0]; // Store PC that last touched each line
+    reg [63:0] access_pc; // Current access PC (input from CPU, simulated for now)
+    
+    // Determine if we're dealing with a sampled set
+    wire is_sampled_set = (set < 64); // First 64 sets are sampled
+    reg is_reuse;
+    // Hawkeye components instances
+    wire should_cache;
+    wire prediction;
+    reg train_up, train_down;
+
+
+    optgen optgen_inst (
+        .clk(clk), 
+        .reset(reset),
+        .set(set),
+        .curr_quanta(curr_quanta),
+        .last_quanta(last_access_quanta[set][tag[5:0]]),
+        .is_reuse(is_reuse),
+        .should_cache(should_cache)
+    );
+
+    hawkeye_predictor predictor_inst (
+        .clk(clk), 
+        .reset(reset),
+        .pc(access_pc),
+        .train_up(train_up),
+        .train_down(train_down),
+        .prediction(prediction)
+    );
+    
     
     for (j=0;j<`DL1ways;j=j+1) begin   
    	
@@ -373,21 +351,30 @@ module DL1cache (clk, reset,cycles,
 	reg [`DL1waysLog2-1:0] miss_way;
 	
 	wire [`VLEN-1:0] rdata_updated;
-	wire hitw;  assign hitw = (wtag==tag_real) && (set_real==baddr) && wvalid;
+	wire hitw;  
+    assign hitw = (wtag==tag_real) && (set_real==baddr) && wvalid;
 	
 	assign rdata_updated=(hitw)?wdata:rdata[hit_way];
 	reg full_line_write_miss;
 	reg [61:0] hit_count;
 	reg [61:0] access_count;
-	
+	reg found_victim;
+
+
 	always @( posedge clk ) begin
 		if (reset) begin
 
-				for (i=0; i<`DL1sets; i=i+1) begin				  
-				    dirty[i]<=0;
-					valid[i]<=0;
-					nru_bit[i]<=0;
-				end
+            for (i=0; i<`DL1sets; i=i+1) begin				  
+                dirty[i]<=0;
+                valid[i]<=0;
+                for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
+                    // valid[i][j_] <= 0;
+                    // dirty[i][j_] <= 0;
+                    rrpv[i][j_] <= 3'b100; // 3
+                    // $display("set %d way %d lru %2b", i, j_, lru_state[i][j_]);
+                    // Reset all states to initial value 00
+                end
+            end
 
 			en_pending<=0;
 			roffset<=0;	
@@ -396,9 +383,28 @@ module DL1cache (clk, reset,cycles,
 			
 			flush_out<=0; flushing<=0; full_line_write_miss<=0;
 			
-			hit_count<=0; access_count<=0;
+			hit_count<=0; access_count<=0; curr_quanta<=0;
+            
 
+            // Reset last access quanta
+            for (integer s = 0; s < `DL1sets; s = s + 1) begin
+                for (integer t = 0; t < 64; t = t + 1) begin
+                    last_access_quanta[s][t] <= 0;
+                end
+            end
 		end else begin
+            
+
+
+
+            if (access && (k % 10000 == 0)) begin
+            $display("Cache access at cycle %d: addr=%h, hit=%b, miss=%b, candidate=%d", 
+                    cycles, addr, hit, miss, candidate);
+            $display("  RRIP states: %b %b %b %b", 
+                    rrpv[set][0], rrpv[set][1], rrpv[set][2], rrpv[set][3]);
+            $display("  Hawkeye: is_reuse=%b, should_cache=%b, prediction=%b", 
+                    is_reuse, should_cache, prediction);
+            end
 
 			we_local <=0; we_pending<=0; ready<=0;
 			weB<=0; enB<=0;
@@ -409,53 +415,250 @@ module DL1cache (clk, reset,cycles,
 			
 			if (en) roffset<=addr[(`VLEN_Log2-3)-1:2];						
 			
-			hit=0; miss=access; zero_found=0;
+			// hit=0; miss=access; zero_found=0;
+
+            train_up <= 0;
+            train_down <= 0;
+            found_victim=0;
+
+            // Update access_pc (in real implementation, this would come from CPU)
+            access_pc <= {{32{1'b0}}, cycles}; // Using cycles as a proxy for PC
 			
-			for (j_=0;j_<`DL1ways;j_=j_+1) begin
-				if (access && ((tag_array[set][j_]==tag) && valid[set][j_])) begin
-					hit=1;
-					candidate=j_;
-					miss=0;
-				end
-				if (access && (nru_bit[set][j_]==0) && (!zero_found) && (!hit)) begin
-					candidate=j_;
-					zero_found=1;
-				end
-			end	
+			// for (j_=0;j_<`DL1ways;j_=j_+1) begin
+			// 	if (access && ((tag_array[set][j_]==tag) && valid[set][j_])) begin
+			// 		hit=1;
+			// 		candidate=j_;
+			// 		miss=0;
+			// 	end
+			// 	if (access && (!zero_found) && (!hit) && rrpv[set_index][j_] == 3'b111) begin
+			// 		candidate=j_;
+			// 		zero_found=1;
+            //         found_victim=1;
+			// 	end
+			// end	
 			
+            
+
+
+            
+            
+            // Set training signals for predictor
+            train_up <= is_reuse && should_cache;
+            train_down <= is_reuse && !should_cache;
+
+
 			if (access) begin
 				access_count<=access_count+1;
+                if (is_sampled_set) begin
+                    curr_quanta <= curr_quanta + 1;
+                end
+
+                // Determine if current access is a reuse in sampled set
+                is_reuse <= is_sampled_set && (last_access_quanta[set][tag[5:0]] != 0);
+
 				if (`DEB)$display("DL1 Access hit %d set %d", hit, set);
-				if ((nru_bit[set] /*|(1<<candidate)*/)=={`DL1ways{1'b1}})
-					nru_bit[set]<=0;
-				nru_bit[set][candidate]<=1;//!(we=={(`VLEN/8){1'b1}});
+				// if ((nru_bit[set] /*|(1<<candidate)*/)=={`DL1ways{1'b1}})
+				// 	nru_bit[set]<=0;
+				// nru_bit[set][candidate]<=1;//!(we=={(`VLEN/8){1'b1}});
+                // Hit/miss detection
+                hit = 0;
+                miss = 1; // Assume miss until hit found
+                candidate = 0;
+                
+                // Search for tag match
+                for (integer j = 0; j < `DL1ways; j = j + 1) begin
+                    if ((tag_array[set][j] == tag) && valid[set][j]) begin
+                        hit = 1;
+                        hit_way = j;
+                        miss = 0;
+                        candidate = j;
+                    end
+                end
+
+
+                if (!hit) begin
+                    // First try to find a cache-averse line (RRIP = 7)
+                    reg found_victim;
+                    found_victim = 0;
+                    
+                    for (integer j = 0; j < `DL1ways; j = j + 1) begin
+                        if (rrpv[set][j] == 3'b111 && !found_victim) begin
+                            candidate = j;
+                            found_victim = 1;
+                        end
+                    end
+                    
+                    // If no cache-averse line, find oldest cache-friendly line
+                    if (!found_victim) begin
+                        reg [2:0] max_rrpv;
+                        max_rrpv = 0;
+                        
+                        for (integer j = 0; j < `DL1ways; j = j + 1) begin
+                            if (rrpv[set][j] >= max_rrpv) begin
+                                max_rrpv = rrpv[set][j];
+                                candidate = j;
+                            end
+                        end
+                    end
+                end
+                // Train Hawkeye predictor (for sampled sets)
+                if (is_sampled_set && is_reuse) begin
+                    train_up <= should_cache;
+                    train_down <= !should_cache;
+                end
+
+                // Update sampler state for current access
+                if (is_sampled_set) begin
+                    last_access_quanta[set][tag[5:0]] <= curr_quanta;
+                end
+
+                if (hit) begin
+                    hit_count<=hit_count+1;
+                    // hit_rate<=(hit_count*100)/access_count;
+                    $display("L1 hit_count %d, access_count %d",hit_count, access_count);
+
+                    last_pc[set][hit_way] <= access_pc;
+                    if (prediction) begin
+                        rrpv[set][hit_way] <= 3'b000; // Cache-friendly: RRIP = 0
+                    end else begin
+                        rrpv[set][hit_way] <= 3'b111; // Cache-averse: RRIP = 7
+                    end
+
+
+                    if (`DEB)$display("hit1 set %d tag %h way %h",set, tag, candidate);
+                    
+                    if (en) ready<=1;
+                    
+                    if (we!=0) begin 
+
+                        we_pending<=(last_set!=set) && !hitw;
+                                                        
+                        we_pending_v=we<<(addr[(`VLEN_Log2-3)-1:2]*4);	
+                        wtag_next=tag;bset=set;
+
+                        we_pending_data=din<<(addr[(`VLEN_Log2-3)-1:2]*32);
+                        
+                        dirty[set][candidate]<=1;											
+                        
+                        
+                        if (`DEB)$display("writeL1 %h at %h was_dirty %h we %h off %d",din,addr, dirty[set][candidate],we, addr[(`VLEN_Log2-3)-1:2]);
+                    end	
+                    hit_way=candidate;
+			    end
+
+                if (miss) begin
+                
+                    if (prediction) begin
+                        // Cache-friendly: RRIP = 0
+                        rrpv[set][candidate] <= 3'b000;
+                        
+                        // Age all other cache-friendly lines
+                        for (integer j = 0; j < `DL1ways; j = j + 1) begin
+                            if (j != candidate && rrpv[set][j] < 3'b110) begin rrpv[set][j] <= rrpv[set][j] + 1;
+                            end
+                        
+                        end 
+                    end else begin
+                        // Cache-averse: RRIP = 7
+                            rrpv[set][candidate] <= 3'b111;
+                    end
+
+
+
+
+                    if (`DEB)$display("miss set %d tag %h way %d",set, tag, candidate);
+                    en_pending_addr<={tag,set,{(`VLEN_Log2-3){1'b0}}};
+
+                    en_pending_write<=we<<(addr[(`VLEN_Log2-3)-1:2]*4);	
+                    if (`DEB)if (we!=0) 
+                        $display("writeL1 %h at %h tag %h way %d", din, addr,tag, candidate);		
+                        
+                    we_pending_data=din<<(addr[(`VLEN_Log2-3)-1:2]*32);
+                                    
+                    if (dirty[set][candidate]&&valid[set][candidate]) begin
+
+                        writeback<=1;
+                        read_once<=1;
+
+                        addrB<={tag_array[set][candidate],set,{(`VLEN_Log2-3){1'b0}}};		
+                    end else begin 
+                        enB<=acceptingB; addrB<={tag,set,{(`VLEN_Log2-3){1'b0}}};
+                        en_pending<=!acceptingB;					
+                    end
+                    
+                    valid[set][candidate]<=1;
+                    dirty[set][candidate]<=we!=0;
+                    tag_array[set][candidate]<=tag;
+                    last_pc[set][candidate] <= access_pc;
+
+                    waiting<=1;
+                    waiting_en<=en;
+                    full_line_write_miss<=0;
+                    
+                    if((we=={(`VLEN/8){1'b1}})) begin
+                        full_line_write_miss<=1;
+                        en_pending<=0; enB<=0;
+                        waiting<=dirty[set][candidate]&&valid[set][candidate];
+                        wdata<= din; 
+
+                        we_local[candidate]<=1; wvalid<=1;
+
+                        if (`DEB)$display("we %h din %h rof %d",we,din, addr[(`VLEN_Log2-3)-1:2]);
+                        if (`DEB)$display("STORE_PEND finished %d",cycles+1);
+
+                    end
+                        
+                    wtag<=tag; baddr<=set;				
+                    miss_way<=candidate;
+
+			    end
+
 			end
 			
-			if (hit) begin
-				hit_count<=hit_count+1;
-				// hit_rate<=(hit_count*100)/access_count;
-				$display("L1 hit_count %d, access_count %d",hit_count, access_count);
-				if (`DEB)$display("hit1 set %d tag %h way %h",set, tag, candidate);
-				
-				if (en) ready<=1;
-				
-				if (we!=0) begin 
 
-					we_pending<=(last_set!=set) && !hitw;
+
+            // // Update last access PC
+            // if (hit)
+            //     last_pc[set_index][hit_way] <= access_pc;
+            // else
+            //     last_pc[set_index][victim_way] <= access_pc;
+                
+            
+
+
+			// if (hit) begin
+			// 	hit_count<=hit_count+1;
+			// 	// hit_rate<=(hit_count*100)/access_count;
+			// 	$display("L1 hit_count %d, access_count %d",hit_count, access_count);
+
+            //     if (prediction) begin
+            //         rrpv[set_index][hit_way] <= 3'b000; // Cache-friendly: RRIP = 0
+            //     end else begin
+            //         rrpv[set_index][hit_way] <= 3'b111; // Cache-averse: RRIP = 7
+            //     end
+
+
+			// 	if (`DEB)$display("hit1 set %d tag %h way %h",set, tag, candidate);
+				
+			// 	if (en) ready<=1;
+				
+			// 	if (we!=0) begin 
+
+			// 		we_pending<=(last_set!=set) && !hitw;
 													
-					we_pending_v=we<<(addr[(`VLEN_Log2-3)-1:2]*4);	
-					wtag_next=tag;bset=set;
+			// 		we_pending_v=we<<(addr[(`VLEN_Log2-3)-1:2]*4);	
+			// 		wtag_next=tag;bset=set;
 
-					we_pending_data=din<<(addr[(`VLEN_Log2-3)-1:2]*32);
+			// 		we_pending_data=din<<(addr[(`VLEN_Log2-3)-1:2]*32);
 					
-					dirty[set][candidate]<=1;											
+			// 		dirty[set][candidate]<=1;											
 					
 					
-					if (`DEB)$display("writeL1 %h at %h was_dirty %h we %h off %d",din,addr, dirty[set][candidate],we, addr[(`VLEN_Log2-3)-1:2]);
-				end	
-				hit_way=candidate;
+			// 		if (`DEB)$display("writeL1 %h at %h was_dirty %h we %h off %d",din,addr, dirty[set][candidate],we, addr[(`VLEN_Log2-3)-1:2]);
+			// 	end	
+			// 	hit_way=candidate;
 
-			end
+			// end
 			
 			if (we_pending  
 				||(hit&&(we!=0)&&((last_set==set)|| hitw))
@@ -471,52 +674,70 @@ module DL1cache (clk, reset,cycles,
 
 			end
 		
-			if (miss) begin
-				if (`DEB)$display("miss set %d tag %h way %d",set, tag, candidate);
-				en_pending_addr<={tag,set,{(`VLEN_Log2-3){1'b0}}};
+			// if (miss) begin
+                
+            //     if (prediction) begin
+            //         // Cache-friendly: RRIP = 0
+            //         rrpv[set][candidate] <= 3'b000;
+                    
+            //         // Age all other cache-friendly lines
+            //         for (way_idx = 0; way_idx < `DL1ways; way_idx = way_idx + 1) begin
+            //             if (way_idx != candidate && rrpv[set][way_idx] < 3'b110)
+            //                 rrpv[set][way_idx] <= rrpv[set][way_idx] + 1;
+            //         end
+            //     end else begin
+            //         // Cache-averse: RRIP = 7
+            //         rrpv[set][candidate] <= 3'b111;
+            //     end
 
-				en_pending_write<=we<<(addr[(`VLEN_Log2-3)-1:2]*4);	
-				if (`DEB)if (we!=0) 
-					$display("writeL1 %h at %h tag %h way %d", din, addr,tag, candidate);		
+
+
+
+			// 	if (`DEB)$display("miss set %d tag %h way %d",set, tag, candidate);
+			// 	en_pending_addr<={tag,set,{(`VLEN_Log2-3){1'b0}}};
+
+			// 	en_pending_write<=we<<(addr[(`VLEN_Log2-3)-1:2]*4);	
+			// 	if (`DEB)if (we!=0) 
+			// 		$display("writeL1 %h at %h tag %h way %d", din, addr,tag, candidate);		
 					
-				we_pending_data=din<<(addr[(`VLEN_Log2-3)-1:2]*32);
+			// 	we_pending_data=din<<(addr[(`VLEN_Log2-3)-1:2]*32);
 								
-				if (dirty[set][candidate]&&valid[set][candidate]) begin
+			// 	if (dirty[set][candidate]&&valid[set][candidate]) begin
 
-					writeback<=1;
-					read_once<=1;
+			// 		writeback<=1;
+			// 		read_once<=1;
 
-					addrB<={tag_array[set][candidate],set,{(`VLEN_Log2-3){1'b0}}};		
-				end else begin 
-					enB<=acceptingB; addrB<={tag,set,{(`VLEN_Log2-3){1'b0}}};
-					en_pending<=!acceptingB;					
-				end
+			// 		addrB<={tag_array[set][candidate],set,{(`VLEN_Log2-3){1'b0}}};		
+			// 	end else begin 
+			// 		enB<=acceptingB; addrB<={tag,set,{(`VLEN_Log2-3){1'b0}}};
+			// 		en_pending<=!acceptingB;					
+			// 	end
 				
-				valid[set][candidate]<=1;
-				dirty[set][candidate]<=we!=0;
-				tag_array[set][candidate]<=tag;
+			// 	valid[set][candidate]<=1;
+			// 	dirty[set][candidate]<=we!=0;
+			// 	tag_array[set][candidate]<=tag;
 				
-				waiting<=1;
-				waiting_en<=en;
-				full_line_write_miss<=0;
+			// 	waiting<=1;
+			// 	waiting_en<=en;
+			// 	full_line_write_miss<=0;
 				
-				if((we=={(`VLEN/8){1'b1}})) begin
-					full_line_write_miss<=1;
-					en_pending<=0; enB<=0;
-					waiting<=dirty[set][candidate]&&valid[set][candidate];
-					wdata<= din; 
+			// 	if((we=={(`VLEN/8){1'b1}})) begin
+			// 		full_line_write_miss<=1;
+			// 		en_pending<=0; enB<=0;
+			// 		waiting<=dirty[set][candidate]&&valid[set][candidate];
+			// 		wdata<= din; 
 
-					we_local[candidate]<=1; wvalid<=1;
+			// 		we_local[candidate]<=1; wvalid<=1;
 
-					if (`DEB)$display("we %h din %h rof %d",we,din, addr[(`VLEN_Log2-3)-1:2]);
-					if (`DEB)$display("STORE_PEND finished %d",cycles+1);
+			// 		if (`DEB)$display("we %h din %h rof %d",we,din, addr[(`VLEN_Log2-3)-1:2]);
+			// 		if (`DEB)$display("STORE_PEND finished %d",cycles+1);
 
-				end
+			// 	end
 					
-				wtag<=tag; baddr<=set;				
-				miss_way<=candidate;
+			// 	wtag<=tag; baddr<=set;				
+			// 	miss_way<=candidate;
 
-			end
+			// end
 					
 			if (writeback) begin 	
 				if (read_once) 
@@ -598,9 +819,6 @@ module DL1cache (clk, reset,cycles,
 		);
 	end
 endmodule // DL1cache
-
-
-// Last-Level Cache implementation in block RAM
 
 module DL2cache (clk, reset, 
 		addr, en, we, din, dout, dready, accepting, flush_in,

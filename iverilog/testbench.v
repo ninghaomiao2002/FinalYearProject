@@ -187,6 +187,12 @@ module Top_Level();
 			if(!debug[`IADDR_bits]) PCprev=PCprevt;
 			k=k+1;	
 		end
+		// Add debugging code here
+		if (k % 10000 == 0) begin
+			$display("Cycle %d: PC = %h, debug = %h", k, PCprev, debug);
+		end
+		
+		
 		
 		// And then issue a "flush-writes" command, to update main memory (here used only for debugging)
 		flush=1; $display("\nFlushing remaing dirty blocks to DRAMs\n");
