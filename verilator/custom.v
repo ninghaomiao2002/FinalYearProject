@@ -1,3 +1,11 @@
+// Similarly in custom.v
+`ifndef _CUSTOM_V_
+`define _CUSTOM_V_
+
+// Your module definitions here...
+
+
+
 `define c3_pipe_cycles 5
 
 
@@ -402,3 +410,4 @@ module ADD_module(clk, reset, valid, data_inA, data_inB, data_out);
 endmodule //ADD_module
 
 
+`endif // _CUSTOM_V_

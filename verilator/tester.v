@@ -1,3 +1,6 @@
+// In tester.v
+`ifndef _TESTER_V_
+`define _TESTER_V_
 `include "./testbench.v"
 
 module tester(clk, reset, finished, fpu1in, fpu2in, fpuen, fpuout);
@@ -25,3 +28,4 @@ module tester(clk, reset, finished, fpu1in, fpu2in, fpuen, fpuout);
 		//data=0;
 	end
 endmodule
+`endif // _TESTER_V_

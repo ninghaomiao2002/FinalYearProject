@@ -93,7 +93,7 @@ module System(clk, reset, StartAddress, StackPointer,
 		addrB, enB, weB, dinB, doutB, readyB, acceptingB, flush,
 		addrC, enC, weC, dinC, doutC, dreadyC, acceptingC, flush_l2);     
     
-    DL2cacheU dc2(clk, reset, 
+    DL2cacheU dc2(clk, reset, cycles,
     	enI, addrI, doutI, readyI,
 		addrC, enC, weC, dinC, doutC, dreadyC, acceptingC, flush_l2,
 		addrD, enD, weD, dinDstrobe, dinD, doutDstrobe, doutD, readyD, accR, accW, flushed); 		

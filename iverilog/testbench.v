@@ -27,14 +27,15 @@
 // Use the StartAddress to set the start address of the binary
 // Use BINARY to set the path of the binary for simulation
 
-// stream.bin
+// // stream.bin
 `define BINARY "stream.bin"
 `define StartAddress 32'h00010584 // stream.bin
 
 // `define BINARY "firmware_sort.bin"
 // `define StartAddress 32'h00010620
 
-
+// `define BINARY "firmware.bin"
+// `define StartAddress 32'h00008000
 
 
 `include "system.v"
@@ -114,9 +115,16 @@ module Memory (clk, reset, addr, en, we, dinDstrobe, din, doutDstrobe, dout, dre
 	
 	initial begin 
 
-		//byte_address=32'h00010000;
+		// for STREAM
 		byte_address=32'h00010074;
-	    fd = $fopen(`BINARY, "rb"); 
+		fd = $fopen(`BINARY, "rb"); 
+
+
+		// for firmware
+		// byte_address=32'h00008000;
+		// fd = $fopen(`BINARY, "rb");
+
+	    
 	    
 	    if (!fd) $error("could not read file");
 	    while (!$feof(fd)) begin
@@ -186,11 +194,18 @@ module Top_Level();
 			clk=1; #10 clk=0;  #10;			
 			if(!debug[`IADDR_bits]) PCprev=PCprevt;
 			k=k+1;	
+			// Optional: Print status every N cycles
+    		// if (k % 10000 == 0) begin
+        	// $display("Cycle %d: PC = %h, debug = %h", k, PCprev, debug);
+		// 	$display("Cycle %d: PC=%h, waiting=%b, pending=%b, state=%d", 
+        //  k, debug[`IADDR_bits-1:0], waiting, pending, state);
+    	// end
 		end
-		// Add debugging code here
-		if (k % 10000 == 0) begin
-			$display("Cycle %d: PC = %h, debug = %h", k, PCprev, debug);
-		end
+		// $display("Simulation completed - program execution finished");
+		// // Add debugging code here
+		// if (k % 10000 == 0) begin
+		// 	$display("Cycle %d: PC = %h, debug = %h", k, PCprev, debug);
+		// end
 		
 		
 		

@@ -1,3 +1,7 @@
+// In system.v
+`ifndef _SYSTEM_V_
+`define _SYSTEM_V_
+
 `define DEB 0
 `define STDO 1
 
@@ -7,7 +11,8 @@
 // `include "caches_srrip.v"
 // `include "caches_random.v"
 // `include "caches_new.v"
-`include "caches_hawkeye.v"
+// `include "caches_hawkeye.v"
+`include "hawkeye.v"
 `include "custom.v"
 
 module System(clk, reset, StartAddress, StackPointer,      
@@ -87,7 +92,7 @@ module System(clk, reset, StartAddress, StackPointer,
     //wire acceptingD; assign acceptingD=!(enD||weD);
     
     
-    DL2cacheU dc2(clk, reset, 
+    DL2cacheU dc2(clk, reset, cycles,
     	enI, addrI, doutI, readyI,
 		addrC, enC, weC, dinC, doutC, dreadyC, acceptingC, flush_l2,
 		addrD, enD, weD, dinDstrobe, dinD, doutDstrobe, doutD, readyD, accR, accW, flushed); 		
@@ -107,4 +112,4 @@ module System(clk, reset, StartAddress, StackPointer,
 endmodule // System8
 
 
-
+`endif // _SYSTEM_V_

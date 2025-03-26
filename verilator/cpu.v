@@ -1,4 +1,7 @@
 //`define XLEN 32 // (not yet other than 32)
+// In cpu.v
+`ifndef _CPU_V_
+`define _CPU_V_
 
 `define IADDR_bits 21
 `define DADDR_bits 30 // >= IADDR_bits
@@ -996,3 +999,4 @@ endmodule // Core
 
 
 
+`endif // _CPU_V_

@@ -1,3 +1,7 @@
+// In testbench.v
+`ifndef _TESTBENCH_V_
+`define _TESTBENCH_V_
+
 `define StackPointer 32'h0ffffff0
 `define StartAddress 32'h00008000 //
 // `define StartAddress 32'h00010584 //32'h000103dc
@@ -241,3 +245,4 @@ module Verilator_Top_Level(clk, reset, finished, fpu1in, fpu2in, fpuen, fpuout);
 	
 endmodule //Top_Level
 // synthesis translate_on
+`endif // _TESTBENCH_V_
