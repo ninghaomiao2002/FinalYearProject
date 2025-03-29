@@ -1,13 +1,10 @@
-// In hawkeye.v
-`ifndef _HAWKEYE_V_
-`define _HAWKEYE_V_
 // In powers of 2 above 1
 `define IL1sets 64
 
-`define DL1sets 16
+`define DL1sets 32
 `define DL1ways 4
 
-`define DL2sets 16
+`define DL2sets 32
 `define DL2ways 4
 `define DL2block 16384 
 `define DL2subblocks 32
@@ -21,197 +18,212 @@
 `define DL2block_Log2 $clog2(`DL2block)
 `define DL2subblocks_Log2 $clog2(`DL2subblocks)
 
+// `define BL1waysLog2 $clog2(`BL1ways)
+
+// `define IADDR_bits 21
+// `define DADDR_bits 30 // >= IADDR_bits
+
+// `define VLEN 256
+// `define VLEN_Log2 $clog2(`VLEN)
+
+// `define NumVregisters 4 // (-1 for register 0, up to 8 -1 registers)
 `define VECTOR_SIZE 32
 `define OCC_WIDTH 4
 
 `define SHCT_SIZE 1024
 `define MAX_SHCT 7
 `define MID_SHCT 4
+// `define Rtype 0 // No immediate
+// `define Itype 1
+// `define Stype 2
+// `define Btype 3
+// `define Utype 4 // 20-bit immediate
+// `define Jtype 5
 
-`define BL1waysLog2 $clog2(`BL1ways)
+// `define DEB 0  // DEB = 1 enables the waveform generation and (meaningless) debugging comments
+// `define STDO 1 // Enables stdout in simulation
 
-module IL1CacheWithImaginaryBL1Cache (clk, reset, PC, instr, ready,
-	en, PCB, instrB, readyB);
-	input clk, reset;
-	input [`IADDR_bits-1:0] PC;  
-    output reg [31:0] instr;
-    output reg ready;
+// // Implementation of the IL1 cache in registers
+// module IL1CacheWithImaginaryBL1Cache (clk, reset, PC, instr, ready,
+// 	en, PCB, instrB, readyB);
+// 	input clk, reset;
+// 	input [`IADDR_bits-1:0] PC;  
+//     output reg [31:0] instr;
+//     output reg ready;
     
-    output reg en;
-    output reg [`IADDR_bits-1:0] PCB;
-    input [`VLEN-1:0] instrB;
-    input readyB;
+//     output reg en;
+//     output reg [`IADDR_bits-1:0] PCB;
+//     input [`VLEN-1:0] instrB;
+//     input readyB;
 
-    /*(* ram_style = "distributed" *)*/ reg [`VLEN-1:0] mem [`IL1sets-1:0];
-    reg [`IADDR_bits-`IL1setsLog2-`VLEN_Log2+3-1:0] tag_array [`IL1sets-1:0];
-    reg valid [`IL1sets-1:0]; // this could be useless 
+//     /*(* ram_style = "distributed" *)*/ reg [`VLEN-1:0] mem [`IL1sets-1:0];
+//     reg [`IADDR_bits-`IL1setsLog2-`VLEN_Log2+3-1:0] tag_array [`IL1sets-1:0];
+//     reg valid [`IL1sets-1:0]; // this could be useless 
     
-    wire [`IL1setsLog2-1:0] set; assign set = PC>>(`VLEN_Log2-3);
-    wire [`IADDR_bits-`IL1setsLog2-`VLEN_Log2+3-1:0] tag; assign tag = PC>>(`VLEN_Log2-3+`IL1setsLog2);
+//     wire [`IL1setsLog2-1:0] set; assign set = PC>>(`VLEN_Log2-3);
+//     wire [`IADDR_bits-`IL1setsLog2-`VLEN_Log2+3-1:0] tag; assign tag = PC>>(`VLEN_Log2-3+`IL1setsLog2);
     
-    wire hit; assign hit = valid[set] && (tag_array[set]==tag);
-    reg [`VLEN_Log2-5-1:0] roffset; //assign roffset = PC>>2;
+//     wire hit; assign hit = valid[set] && (tag_array[set]==tag);
+//     reg [`VLEN_Log2-5-1:0] roffset; //assign roffset = PC>>2;
     
-    reg [5+3+5-1:0] bl1_tag_array [`BL1ways-1:0];
-    reg bl1_valid [`BL1ways-1:0];
-	reg bl1_hit; 
+//     reg [5+3+5-1:0] bl1_tag_array [`BL1ways-1:0];
+//     reg bl1_valid [`BL1ways-1:0];
+// 	reg bl1_hit; 
 	
-	reg [`BL1ways-1:0] bl1_nru_bit; reg zero_found; reg [`BL1waysLog2-1:0] candidate;
+// 	reg [`BL1ways-1:0] bl1_nru_bit; reg zero_found; reg [`BL1waysLog2-1:0] candidate;
 	
-	reg [5+3+5-1:0] opcode_plus;
-	reg in_M_or_F;
+// 	reg [5+3+5-1:0] opcode_plus;
+// 	reg in_M_or_F;
 	
-	reg [`BL1lat-1:0] bl1_delay; //reg bl1_was_miss;	
-	reg [`BL1lat-1:0] bl1_delay_hits; //(normally with BL1lathit, but that can be 0)
+// 	reg [`BL1lat-1:0] bl1_delay; //reg bl1_was_miss;	
+// 	reg [`BL1lat-1:0] bl1_delay_hits; //(normally with BL1lathit, but that can be 0)
 	
-	reg pending; integer i,j;  
+// 	reg pending; integer i,j;  
 	
-	always @( posedge clk ) begin
-		if (reset) begin
-			for (i=0; i<`IL1sets; i=i+1) begin
-				valid[i]<=0;	
-				tag_array[i]<=0;
-			end
-			pending<=0;	en<=0;
-			bl1_delay<=0; bl1_nru_bit<=0; //ready<=1;
-			bl1_delay_hits<=0; //bl1_was_miss<=0;
+// 	always @( posedge clk ) begin
+// 		if (reset) begin
+// 			for (i=0; i<`IL1sets; i=i+1) begin
+// 				valid[i]<=0;	
+// 				tag_array[i]<=0;
+// 			end
+// 			pending<=0;	en<=0;
+// 			bl1_delay<=0; bl1_nru_bit<=0; //ready<=1;
+// 			bl1_delay_hits<=0; //bl1_was_miss<=0;
 			
-		end else begin
-			// Plseudo LRU mechanism for the tags of the fake bitstream cache (L0)
-			opcode_plus = readyB?
-				{instrB[31+(roffset)*32-:5],
-				 instrB[14+(roffset)*32-:3],
-				 instrB[06+(roffset)*32-:5]}:
+// 		end else begin
+// 			// Plseudo LRU mechanism for the tags of the fake bitstream cache (L0)
+// 			opcode_plus = readyB?
+// 				{instrB[31+(roffset)*32-:5],
+// 				 instrB[14+(roffset)*32-:3],
+// 				 instrB[06+(roffset)*32-:5]}:
 				 
-				{mem[set][31+(PC[`VLEN_Log2-5-1+2:2]*32)-:5],
-			     mem[set][14+(PC[`VLEN_Log2-5-1+2:2]*32)-:3],
-			     mem[set][06+(PC[`VLEN_Log2-5-1+2:2]*32)-:5]};
-			in_M_or_F = (opcode_plus[5-1:0] == 5'hC) || // M
-						(opcode_plus[5-1:0] == 5'h10)|| // F fma
-						(opcode_plus[5-1:0] == 5'h11)|| // F fma
-						(opcode_plus[5-1:0] == 5'h12)|| // F fma
-						(opcode_plus[5-1:0] == 5'h13)|| // F fma
-						((opcode_plus[5-1:0] == 5'h14) 
-						 && !(opcode_plus[12-:5]==5'h1c)  // F rest, not fmv
-						 && !(opcode_plus[12-:5]==5'h1e));
+// 				{mem[set][31+(PC[`VLEN_Log2-5-1+2:2]*32)-:5],
+// 			     mem[set][14+(PC[`VLEN_Log2-5-1+2:2]*32)-:3],
+// 			     mem[set][06+(PC[`VLEN_Log2-5-1+2:2]*32)-:5]};
+// 			in_M_or_F = (opcode_plus[5-1:0] == 5'hC) || // M
+// 						(opcode_plus[5-1:0] == 5'h10)|| // F fma
+// 						(opcode_plus[5-1:0] == 5'h11)|| // F fma
+// 						(opcode_plus[5-1:0] == 5'h12)|| // F fma
+// 						(opcode_plus[5-1:0] == 5'h13)|| // F fma
+// 						((opcode_plus[5-1:0] == 5'h14) 
+// 						 && !(opcode_plus[12-:5]==5'h1c)  // F rest, not fmv
+// 						 && !(opcode_plus[12-:5]==5'h1e));
 			
-			if (`BL1mode==1) begin // pre-defined instruction groups
-				if ((opcode_plus[5-1:0] == 5'h10)|| // F fma
-					(opcode_plus[5-1:0] == 5'h11)|| 
-					(opcode_plus[5-1:0] == 5'h12)||
-					(opcode_plus[5-1:0] == 5'h13)) begin
-					opcode_plus[5-1:0]=5'h10;
-				end
-				if ((opcode_plus[5-1:0] == 5'hC)) begin // M
-					opcode_plus[5]=0;
-					if (opcode_plus[7:6]== 2'b01)
-						opcode_plus[7:6]=0;
-				end
-				if ((opcode_plus[5-1:0] == 5'h14)) begin // F rest,..
-					case (opcode_plus[12-:5])
-						//5'h0: opcode_plus[14-:5]=0;
-						5'h1: opcode_plus[12-:5]=0;
-						//5'h2: opcode_plus[14-:5]=2;
-						//5'h3: opcode_plus[14-:5]=3;
-						//5'h4: opcode_plus[14-:5]=4;
-						5'h5: opcode_plus[12-:5]=4;
-						//5'h14: opcode_plus[14-:5]=5'h14;
-						//5'h18: opcode_plus[14-:5]=5'h18;
-						5'h1a: opcode_plus[12-:5]=5'h18;
-					 endcase
-				end	
-				if (`BL1mode==2) begin 
-					opcode_plus[12-:8]=0;
-					if (opcode_plus[5-1:0] >= 5'h10)
-						opcode_plus[5-1:0] = 5'h14;
-				end
+// 			if (`BL1mode==1) begin // pre-defined instruction groups
+// 				if ((opcode_plus[5-1:0] == 5'h10)|| // F fma
+// 					(opcode_plus[5-1:0] == 5'h11)|| 
+// 					(opcode_plus[5-1:0] == 5'h12)||
+// 					(opcode_plus[5-1:0] == 5'h13)) begin
+// 					opcode_plus[5-1:0]=5'h10;
+// 				end
+// 				if ((opcode_plus[5-1:0] == 5'hC)) begin // M
+// 					opcode_plus[5]=0;
+// 					if (opcode_plus[7:6]== 2'b01)
+// 						opcode_plus[7:6]=0;
+// 				end
+// 				if ((opcode_plus[5-1:0] == 5'h14)) begin // F rest,..
+// 					case (opcode_plus[12-:5])
+// 						//5'h0: opcode_plus[14-:5]=0;
+// 						5'h1: opcode_plus[12-:5]=0;
+// 						//5'h2: opcode_plus[14-:5]=2;
+// 						//5'h3: opcode_plus[14-:5]=3;
+// 						//5'h4: opcode_plus[14-:5]=4;
+// 						5'h5: opcode_plus[12-:5]=4;
+// 						//5'h14: opcode_plus[14-:5]=5'h14;
+// 						//5'h18: opcode_plus[14-:5]=5'h18;
+// 						5'h1a: opcode_plus[12-:5]=5'h18;
+// 					 endcase
+// 				end	
+// 				if (`BL1mode==2) begin 
+// 					opcode_plus[12-:8]=0;
+// 					if (opcode_plus[5-1:0] >= 5'h10)
+// 						opcode_plus[5-1:0] = 5'h14;
+// 				end
 					
-			end
-			//$display("%h", opcode_plus);     
-			// Find if there is an opcode hit, otherwise find eviction candidate 		
-			//if (ready||readyB/*(bl1_delay==0)*/) begin
-			bl1_hit = (`BL1lat==0) || (!in_M_or_F); zero_found = 0;
-			for (j=0; j<`BL1ways; j=j+1) begin
-				if ((hit||readyB) && bl1_valid[j] && (bl1_tag_array[j]==opcode_plus)) begin
-					bl1_hit=1;
-					candidate=j;					
-				end		
-				if ((hit||readyB) && (bl1_nru_bit[j]==0) &&(!zero_found) && (!bl1_hit)) begin
-					candidate=j;
-					zero_found=1;
-				end				
-			end
-			//end	
-			// Update opcode cache (can impact time but not correctness)			
-			if (in_M_or_F && ((hit&&ready)||readyB)) begin
-				if (bl1_nru_bit=={`BL1ways{1'b1}})
-					bl1_nru_bit<=0;
-				bl1_nru_bit[candidate]<=1;
-				bl1_tag_array[candidate]<=opcode_plus;
-				bl1_valid[candidate]<=1;				
-			end
-			//bl1_hit = 0;
+// 			end
+// 			//$display("%h", opcode_plus);     
+// 			// Find if there is an opcode hit, otherwise find eviction candidate 		
+// 			//if (ready||readyB/*(bl1_delay==0)*/) begin
+// 			bl1_hit = (`BL1lat==0) || (!in_M_or_F); zero_found = 0;
+// 			for (j=0; j<`BL1ways; j=j+1) begin
+// 				if ((hit||readyB) && bl1_valid[j] && (bl1_tag_array[j]==opcode_plus)) begin
+// 					bl1_hit=1;
+// 					candidate=j;					
+// 				end		
+// 				if ((hit||readyB) && (bl1_nru_bit[j]==0) &&(!zero_found) && (!bl1_hit)) begin
+// 					candidate=j;
+// 					zero_found=1;
+// 				end				
+// 			end
+// 			//end	
+// 			// Update opcode cache (can impact time but not correctness)			
+// 			if (in_M_or_F && ((hit&&ready)||readyB)) begin
+// 				if (bl1_nru_bit=={`BL1ways{1'b1}})
+// 					bl1_nru_bit<=0;
+// 				bl1_nru_bit[candidate]<=1;
+// 				bl1_tag_array[candidate]<=opcode_plus;
+// 				bl1_valid[candidate]<=1;				
+// 			end
+// 			//bl1_hit = 0;
 							
-			if (((ready && hit)||readyB) && (!bl1_hit)) begin
-				bl1_delay <= (bl1_delay <<1) | 1'b1;
-			end else begin
-				bl1_delay <= (bl1_delay <<1);
-			end
+// 			if (((ready && hit)||readyB) && (!bl1_hit)) begin
+// 				bl1_delay <= (bl1_delay <<1) | 1'b1;
+// 			end else begin
+// 				bl1_delay <= (bl1_delay <<1);
+// 			end
 			
-			if (((ready && hit)||readyB) && (bl1_hit && in_M_or_F) 
-				&& (`BL1lathit!=0)) 
-			begin
-				bl1_delay_hits <= (bl1_delay_hits <<1) | 1'b1;
-			end else begin
-				bl1_delay_hits <= (bl1_delay_hits <<1);
-			end
+// 			if (((ready && hit)||readyB) && (bl1_hit && in_M_or_F) 
+// 				&& (`BL1lathit!=0)) 
+// 			begin
+// 				bl1_delay_hits <= (bl1_delay_hits <<1) | 1'b1;
+// 			end else begin
+// 				bl1_delay_hits <= (bl1_delay_hits <<1);
+// 			end
 				 
 				 
-			if (readyB) begin
-				mem[set]<=instrB;
-				// if (`DEB)$display("filling set %d with %h ready %d",set,instrB, ready);
-				instr<=instrB[(roffset+1)*32-1-:32];     
-			end //else begin
-			else if (hit &&ready)
-				instr<=mem[set][(PC[`VLEN_Log2-5-1+2:2]+1)*32-1-:32];
-				//$display("non filling");
-			//end
+// 			if (readyB) begin
+// 				mem[set]<=instrB;
+// 				// if (`DEB)$display("filling set %d with %h ready %d",set,instrB, ready);
+// 				instr<=instrB[(roffset+1)*32-1-:32];     
+// 			end //else begin
+// 			else if (hit &&ready)
+// 				instr<=mem[set][(PC[`VLEN_Log2-5-1+2:2]+1)*32-1-:32];
+// 				//$display("non filling");
+// 			//end
 			
-			//ready<=((hit||readyB) && bl1_hit && (bl1_delay==0)) || bl1_delay[`BL1lat-1];
-			//ready<= (hit && bl1_hit && (bl1_delay==0)) || (readyB && (bl1_hit/*||bl1_delay[`BL1lat-1]*/)); 					
-			ready<=(((ready&&hit/*&&(bl1_delay==0)*/)||readyB) && bl1_hit &&((!in_M_or_F) || (`BL1lathit==0)) ) 
-			|| (bl1_delay/*==1'b1<<`BL1lat-1*/[`BL1lat-1] /*&& bl1_was_miss*/) 
-			|| (/*(`BL1lathit!=0)&&*/(bl1_delay_hits/*==1'b1<<`BL1lat-1*/[`BL1lathit-1]) /*&& !bl1_was_miss*/);
+// 			//ready<=((hit||readyB) && bl1_hit && (bl1_delay==0)) || bl1_delay[`BL1lat-1];
+// 			//ready<= (hit && bl1_hit && (bl1_delay==0)) || (readyB && (bl1_hit/*||bl1_delay[`BL1lat-1]*/)); 					
+// 			ready<=(((ready&&hit/*&&(bl1_delay==0)*/)||readyB) && bl1_hit &&((!in_M_or_F) || (`BL1lathit==0)) ) 
+// 			|| (bl1_delay/*==1'b1<<`BL1lat-1*/[`BL1lat-1] /*&& bl1_was_miss*/) 
+// 			|| (/*(`BL1lathit!=0)&&*/(bl1_delay_hits/*==1'b1<<`BL1lat-1*/[`BL1lathit-1]) /*&& !bl1_was_miss*/);
 			
-			//if(readyB && (bl1_delay!=0))$display("error");
+// 			//if(readyB && (bl1_delay!=0))$display("error");
 			
-			// if (`DEB) $display("ihit %d roffset %d %h",hit,roffset,PC);
+// 			// if (`DEB) $display("ihit %d roffset %d %h",hit,roffset,PC);
 
-			en<=0;
-			if ((/*ready &&*/ !hit) && (!pending) /*&& (bl1_delay==0)*/) begin 
-				en<=1;
-				pending<=1;
-				roffset <= PC>>2;		
-				PCB<=PC;
-				// if (`DEB)$display("requesting %h",PC);
-			end
+// 			en<=0;
+// 			if ((/*ready &&*/ !hit) && (!pending) /*&& (bl1_delay==0)*/) begin 
+// 				en<=1;
+// 				pending<=1;
+// 				roffset <= PC>>2;		
+// 				PCB<=PC;
+// 				// if (`DEB)$display("requesting %h",PC);
+// 			end
 			
-			if (readyB) begin
-				pending<=0;				
-				valid[set]<=1;
-				tag_array[set]<=tag; //PCB>>(`VLEN_Log2-3+`IL1setsLog2);
-			end	
+// 			if (readyB) begin
+// 				pending<=0;				
+// 				valid[set]<=1;
+// 				tag_array[set]<=tag; //PCB>>(`VLEN_Log2-3+`IL1setsLog2);
+// 			end	
 
-		end
-	end		
+// 		end
+// 	end		
 	
-	initial begin
-		//if (`DEB)$dumpvars(0, clk, reset, 
-		//PC, instr, ready, en, PCB, instrB, readyB, hit, bl1_hit,bl1_delay);
-	end
-endmodule
-// Implementation of the IL1 cache in registers
-
+// 	initial begin
+// 		//if (`DEB)$dumpvars(0, clk, reset, 
+// 		//PC, instr, ready, en, PCB, instrB, readyB, hit, bl1_hit,bl1_delay);
+// 	end
+// endmodule
 module IL1Cache (clk, reset, PC, instr, ready,
 	en, PCB, instrB, readyB);
 	input clk, reset;
@@ -282,118 +294,6 @@ module IL1Cache (clk, reset, PC, instr, ready,
 	end
 endmodule
 
-module IL1CacheBlock (clk, reset, PC, instr, ready,
-	en, PCB, instrB, readyB);
-	input clk, reset;
-	input [`IADDR_bits-1:0] PC;  
-    output [31:0] instr;
-    output reg ready;
-    
-    output reg en;
-    output reg [`IADDR_bits-1:0] PCB;
-    input [`VLEN-1:0] instrB;
-    input readyB;
-        
-    //assign PCB=PC;
-    // now works with both distributed and block, distributed turned faster
-    (* ram_style = "distributed" *) reg [`VLEN-1:0] block_ram [`IL1sets-1:0];
-    reg [`IADDR_bits-`IL1setsLog2-`VLEN_Log2+3-1:0] tag_array [`IL1sets-1:0];
-    reg valid [`IL1sets-1:0];
-    
-    wire [`IL1setsLog2-1:0] set; assign set = PC>>(`VLEN_Log2-3);
-    wire [`IADDR_bits-`IL1setsLog2-`VLEN_Log2+3-1:0] tag; assign tag = PC>>(`VLEN_Log2-3+`IL1setsLog2);
-    
-    wire hit; assign hit = valid[set] && (tag_array[set]==tag);
-    reg [`VLEN_Log2-5-1:0] roffset; //assign roffset = PC>>2;
-    
-    reg [`VLEN-1:0] dout; reg [32-1:0] dout_i; reg [32-1:0] doutB_i; 
-    
-	//assign instr=readyB?instrB[(roffset+1)*32-1-:32]:dout[(roffset+1)*32-1-:32];
-	//assign instr=!hit?instrB[(roffset+1)*32-1-:32]:dout[(roffset+1)*32-1-:32];
-	
-	
-	reg pending; integer i;  
-	reg [`IL1setsLog2-1:0] bset; 
-	reg tick; reg direction;
-	always @( posedge clk ) begin
-	
-		/*if (reset) begin
-			dout<=0;
-		end else*/ begin
-			if (readyB) begin
-				block_ram[set]<=instrB;
-				//$display(din," ",addr);
-			//end else begin   
-				// if (`DEB)$display("filling set %d with %h ready %d",set,instrB, ready);
-				     
-			end else begin   
-				dout<=block_ram[set];//[(PC[3:2]+1)*32-1-:32];
-				//$display("non filling");
-			end
-			
-			if(reset) begin
-				tick<=0;//PCB<=0;
-			end else begin
-				tick<=!tick;
-				//PCB<=PC;
-			end
-						
-			direction<=readyB;
-			
-			if (readyB)	doutB_i<=instrB[(roffset+1)*32-1-:32];
-			
-		end
-	end  
-
-	assign instr=direction?doutB_i:dout_i;
-	
-	always @(tick) begin
-		//if(readyB)
-		dout_i=dout[(PCB[`VLEN_Log2-5-1+2:2]+1)*32-1-:32];		
-	end
-	
-	always @( posedge clk ) begin
-		if (reset) begin
-			for (i=0; i<`IL1sets; i=i+1) begin
-				valid[i]<=0;	
-				tag_array[i]<=0;
-			end
-			pending<=0;	en<=0;
-
-			PCB<=0;
-		end else begin
-			
-			ready<=hit||readyB;
-			
-			// if (`DEB)$display("ihit %d roffset %d %h",hit,roffset,PC);
-
-			en<=0;
-			if ((!hit) && (!pending)) begin 
-				en<=1;
-				pending<=1;
-				bset<=set;
-				roffset <= PC>>2;				
-				
-				// if (`DEB)$display("requesting %h",PC);
-			end
-			
-			if (readyB) begin
-				pending<=0;				
-				valid[set]<=1;
-				tag_array[set]<=tag;
-			end	
-
-			PCB<=PC;
-			
-		end
-	end	
-	
-	initial begin
-		//if (`DEB)$dumpvars(0, clk, reset, 
-		//PC, instr, ready, en, PCB, instrB, readyB, hit);
-	end
-endmodule
-
 module optgen 
 // #(
     // parameter NUM_SETS = 64,DL1sets
@@ -420,6 +320,9 @@ module optgen
 
     // Initialization
     integer s, q;
+	integer q_idx;
+    // integer i;
+    reg done;
     always @(posedge clk or posedge reset) begin
         if (reset) begin
             // Initialize all occupancy vectors to 0
@@ -430,32 +333,54 @@ module optgen
     end
 
     // Compute "should_cache" (simulate OPT)
-    always @(*) begin
-        should_cache = 1;
-
-        if (is_reuse) begin
-            integer q_idx;
-            q_idx = last_quanta;
-            while (q_idx != curr_quanta) begin
-                if (occupancy_vector[set][q_idx] >= `DL1ways)
-                    should_cache = 0; // too many live intervals => not cached
-                q_idx = (q_idx + 1) % `VECTOR_SIZE;
+always @(*) begin
+    should_cache = 1;
+    if (is_reuse) begin
+        
+        
+        q_idx = last_quanta;
+        done = 0;
+        
+        // Loop at most VECTOR_SIZE times
+        for (i = 0; i < `VECTOR_SIZE; i = i + 1) begin
+            if (!done) begin
+                if (q_idx == curr_quanta) begin
+                    done = 1;
+                end else begin
+                    if (occupancy_vector[set][q_idx] >= `DL1ways)
+                        should_cache = 0;
+                    q_idx = (q_idx + 1) % `VECTOR_SIZE;
+                end
             end
         end
     end
-
+end
+// integer q_idx;
+// integer i;
+// reg done;
     // Update occupancy vector if should_cache == 1
-    always @(posedge clk) begin
-        if (is_reuse && should_cache && !reset) begin
-            integer q_idx;
-            q_idx = last_quanta;
-            while (q_idx != curr_quanta) begin
-                if (occupancy_vector[set][q_idx] < `DL1ways)
-                    occupancy_vector[set][q_idx] = occupancy_vector[set][q_idx] + 1;
-                q_idx = (q_idx + 1) % `VECTOR_SIZE;
+    // Update occupancy vector if should_cache == 1
+always @(posedge clk) begin
+    if (is_reuse && should_cache && !reset) begin
+        
+        
+        q_idx = last_quanta;
+        done = 0;
+        
+        // Loop at most VECTOR_SIZE times
+        for (i = 0; i < `VECTOR_SIZE; i = i + 1) begin
+            if (!done) begin
+                if (q_idx == curr_quanta) begin
+                    done = 1;
+                end else begin
+                    if (occupancy_vector[set][q_idx] < `DL1ways)
+                        occupancy_vector[set][q_idx] <= occupancy_vector[set][q_idx] + 1;
+                    q_idx = (q_idx + 1) % `VECTOR_SIZE;
+                end
             end
         end
     end
+end
 
 endmodule
 
@@ -479,12 +404,14 @@ module hawkeye_predictor (
     endfunction
 
     integer i;
+	integer idx;
     always @(posedge clk or posedge reset) begin
         if (reset) begin
             for (i = 0; i < `SHCT_SIZE; i++)
-                shct[i] = `MID_SHCT;
+                shct[i] <= `MID_SHCT;
         end else begin
-            integer idx = hash(pc);
+            
+			idx = hash(pc);
             if (train_up && shct[idx] < `MAX_SHCT) begin
                 shct[idx] <= shct[idx] + 1;
             end
@@ -522,7 +449,8 @@ module DL1cache (clk, reset,cycles,
     input acceptingB;
     output reg flush_out;
     
-    (* ram_style = "block" *) reg [`VLEN-1:0] way [`DL1ways-1:0][`DL1sets-1:0] ;
+    (* ram_style = "block" *) 
+	reg [`VLEN-1:0] way [`DL1ways-1:0][`DL1sets-1:0] ;
     reg [`VLEN-1:0] rdata [`DL1ways-1:0];
     reg [`VLEN-1:0] wdata;
 
@@ -655,7 +583,10 @@ module DL1cache (clk, reset,cycles,
 	reg [61:0] hit_count;
 	reg [61:0] access_count;
 	reg found_victim;
-
+	integer s;
+	integer t;
+	reg [2:0] max_rrpv;
+	// reg found_victim;
 
 	always @( posedge clk ) begin
 		if (reset) begin
@@ -683,13 +614,17 @@ module DL1cache (clk, reset,cycles,
             
 
             // Reset last access quanta
-            for (integer s = 0; s < `DL1sets; s = s + 1) begin
-                for (integer t = 0; t < 64; t = t + 1) begin
+            for (s = 0; s < `DL1sets; s = s + 1) begin
+                for (t = 0; t < 64; t = t + 1) begin
                     last_access_quanta[s][t] <= 0;
                 end
             end
 		end else begin
-            
+            // In DL1cache or DL2cache module, add in the main always block:
+			// if (addr == 32'h00c2a4 && en) begin
+			// 	$display("DEBUG: Cycle %d, Cache access at deadlock PC, waiting=%b, en_pending=%b", 
+			// 			cycles, waiting, en_pending);
+			// end
 
 
 
@@ -760,39 +695,39 @@ module DL1cache (clk, reset,cycles,
                 hit = 0;
                 miss = 1; // Assume miss until hit found
                 candidate = 0;
-                
+                // integer j;
                 // Search for tag match
-                for (integer j = 0; j < `DL1ways; j = j + 1) begin
-                    if ((tag_array[set][j] == tag) && valid[set][j]) begin
-                        hit = 1;
-                        hit_way = j;
-                        miss = 0;
-                        candidate = j;
+                for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
+                    if ((tag_array[set][j_] == tag) && valid[set][j_]) begin
+                        hit <= 1;
+                        hit_way <= j_;
+                        miss <= 0;
+                        candidate <= j_;
                     end
                 end
 
 
                 if (!hit) begin
                     // First try to find a cache-averse line (RRIP = 7)
-                    reg found_victim;
+                    // reg found_victim;
                     found_victim = 0;
-                    
-                    for (integer j = 0; j < `DL1ways; j = j + 1) begin
-                        if (rrpv[set][j] == 3'b111 && !found_victim) begin
-                            candidate = j;
-                            found_victim = 1;
+                    // integer j;
+                    for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
+                        if (rrpv[set][j_] == 3'b111 && !found_victim) begin
+                            candidate <= j_;
+                            found_victim <= 1;
                         end
                     end
                     
                     // If no cache-averse line, find oldest cache-friendly line
                     if (!found_victim) begin
-                        reg [2:0] max_rrpv;
+                        // reg [2:0] max_rrpv;
                         max_rrpv = 0;
-                        
-                        for (integer j = 0; j < `DL1ways; j = j + 1) begin
-                            if (rrpv[set][j] >= max_rrpv) begin
-                                max_rrpv = rrpv[set][j];
-                                candidate = j;
+                        // integer j;
+                        for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
+                            if (rrpv[set][j_] >= max_rrpv) begin
+                                max_rrpv <= rrpv[set][j_];
+                                candidate <= j_;
                             end
                         end
                     end
@@ -847,10 +782,10 @@ module DL1cache (clk, reset,cycles,
                     if (prediction) begin
                         // Cache-friendly: RRIP = 0
                         rrpv[set][candidate] <= 3'b000;
-                        
+                        // integer j;
                         // Age all other cache-friendly lines
-                        for (integer j = 0; j < `DL1ways; j = j + 1) begin
-                            if (j != candidate && rrpv[set][j] < 3'b110) begin rrpv[set][j] <= rrpv[set][j] + 1;
+                        for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
+                            if (j_ != candidate && rrpv[set][j_] < 3'b110) begin rrpv[set][j_] <= rrpv[set][j_] + 1;
                             end
                         
                         end 
@@ -1119,7 +1054,6 @@ endmodule // DL1cache
 module DL2cache (clk, reset, cycles,
 		addr, en, we, din, dout, dready, accepting, flush_in,
 		addrB, enB, weB, dinBstrobe, dinB, doutBstrobe, doutB, dreadyB, accR, accW, flush_out);
-	
 	input clk, reset; input [31:0] cycles;
 	
 	input [`DADDR_bits-1:0] addr;	
@@ -1143,7 +1077,8 @@ module DL2cache (clk, reset, cycles,
     input accW;
     output reg flush_out;
     
-    (* ram_style = "block" *) reg [`DL2block/`DL2subblocks-1:0] way [`DL2ways-1:0][`DL2sets*`DL2subblocks-1:0] ;
+    (* ram_style = "block" *) 
+	reg [`DL2block/`DL2subblocks-1:0] way [`DL2ways-1:0][`DL2sets*`DL2subblocks-1:0] ;
     reg [`DL2block/`DL2subblocks-1:0] rdata [`DL2ways-1:0];
     reg [`DL2block/`DL2subblocks-1:0] wdata;
 
@@ -1222,7 +1157,7 @@ module DL2cache (clk, reset, cycles,
     reg train_up, train_down;
 	// Add this for the 'cycles' reference
 	// reg [63:0] cycles; // Counter for tracking simulation cycles
-	
+
 	
 
 	// Add this for 'full_line_write_miss' references
@@ -1299,6 +1234,9 @@ module DL2cache (clk, reset, cycles,
 	reg [61:0] hit_count;
 	reg [61:0] access_count;
 	reg found_victim;
+	integer s;
+	integer t;
+	reg [2:0] max_rrpv;
 	
 	always @( posedge clk ) begin
 		if (reset) begin
@@ -1323,15 +1261,21 @@ module DL2cache (clk, reset, cycles,
 			read_strobe<=0; write_strobe<=0; doutBstrobe<=0;flush_way<=0;
 
 			hit_count<=0; access_count<=0; curr_quanta<=0;
-
+			// integer s;
+			// integer t;
 			// Reset last access quanta
-            for (integer s = 0; s < `DL1sets; s = s + 1) begin
-                for (integer t = 0; t < 64; t = t + 1) begin
+            for (s = 0; s < `DL1sets; s = s + 1) begin
+                for (t = 0; t < 64; t = t + 1) begin
                     last_access_quanta[s][t] <= 0;
                 end
             end
 
 		end else begin
+			// In DL1cache or DL2cache module, add in the main always block:
+			// if (addr == 32'h00c2a4 && en) begin
+			// 	$display("DEBUG: Cycle %d, Cache access at deadlock PC, waiting=%b, en_pending=%b", 
+			// 			cycles, waiting, en_pending);
+			// end
 
 			we_local <=0; we_pending<=0; ready<=0;
 			weB<=0; enB<=0; flush_out<=0; 
@@ -1379,25 +1323,25 @@ module DL2cache (clk, reset, cycles,
 				// if ((nru_bit[set] /*|(1<<candidate)*/)=={`DL2ways{1'b1}})
 				// 	nru_bit[set]<=0;
 				// nru_bit[set][candidate]<=1;
-				hit <= 0;
-                miss <= 1; // Assume miss until hit found
-                candidate <= 0;
-
+				hit = 0;
+                miss = 1; // Assume miss until hit found
+                candidate = 0;
+				// integer j;
 				// Search for tag match
-                for (integer j = 0; j < `DL2ways; j = j + 1) begin
-                    if ((tag_array[set][j] == tag) && valid[set][j]) begin
+                for (j_ = 0; j_ < `DL2ways; j_ = j_ + 1) begin
+                    if ((tag_array[set][j_] == tag) && valid[set][j_]) begin
                         hit <= 1;
-                        hit_way <= j;
+                        hit_way <= j_;
                         miss <= 0;
-                        candidate <= j;
+                        candidate <= j_;
                     end
                 end
 
 				if (!hit) begin
                     // First try to find a cache-averse line (RRIP = 7)
-                    reg found_victim;
-                    found_victim <= 0;
-                    
+                    // reg found_victim;
+                    found_victim = 0;
+                    // integer j;
                     for (j_ = 0; j_ < `DL2ways; j_ = j_ + 1) begin
                         if (rrpv[set][j_] == 3'b111 && !found_victim) begin
                             candidate <= j_;
@@ -1407,9 +1351,9 @@ module DL2cache (clk, reset, cycles,
                     
                     // If no cache-averse line, find oldest cache-friendly line
                     if (!found_victim) begin
-                        reg [2:0] max_rrpv;
-                        max_rrpv <= 0;
-                        
+                        // reg [2:0] max_rrpv;
+                        max_rrpv = 0;
+                        // integer j;
                         for (j_ = 0; j_ < `DL2ways; j_ = j_ + 1) begin
                             if (rrpv[set][j_] >= max_rrpv) begin
                                 max_rrpv <= rrpv[set][j_];
@@ -1474,8 +1418,7 @@ module DL2cache (clk, reset, cycles,
                         // integer j;
                         // Age all other cache-friendly lines
                         for (j_ = 0; j_ < `DL1ways; j_ = j_ + 1) begin
-                            if (j_ != candidate && rrpv[set][j_] < 3'b110) begin 
-								rrpv[set][j_] <= rrpv[set][j_] + 1;
+                            if (j_ != candidate && rrpv[set][j_] < 3'b110) begin rrpv[set][j_] <= rrpv[set][j_] + 1;
                             end
                         
                         end 
@@ -1816,5 +1759,3 @@ module DL2cacheU (clk, reset, cycles,
 		if (`DEB)$dumpvars(0, clk, reset, en,we,enI, enD, weD, dreadyI, dreadyD,  dready,pending,pendingI);
 	end	
 endmodule // DL2cacheU
-
-`endif // _HAWKEYE_V_

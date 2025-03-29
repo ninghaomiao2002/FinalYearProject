@@ -34,6 +34,7 @@
 // `include "caches_hawkeye.v"
 // `include "caches_drrip.v"
 `include "hawkeye.v"
+// `include "reference.v"
 `include "custom.v"
 
 module System(clk, reset, StartAddress, StackPointer,      

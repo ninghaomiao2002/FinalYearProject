@@ -1,10 +1,10 @@
 // In powers of 2 above 1
 `define IL1sets 64
 
-`define DL1sets 16
+`define DL1sets 32
 `define DL1ways 4
 
-`define DL2sets 16
+`define DL2sets 32
 `define DL2ways 4
 `define DL2block 16384 
 `define DL2subblocks 32
@@ -99,12 +99,6 @@ module IL1Cache (clk, reset, PC, instr, ready,
 endmodule
 
 module optgen 
-// #(
-    // parameter NUM_SETS = 64,DL1sets
-    // parameter VECTOR_SIZE = 32,
-    // parameter ASSOC = 16,`DL1ways              // set associativity
-    // parameter OCC_WIDTH = 4            // 4-bit occupancy counter
-// )
 (
     input wire clk,
     input wire reset,
@@ -121,9 +115,8 @@ module optgen
     reg [`OCC_WIDTH-1:0] occupancy_vector [`DL1sets-1:0][`VECTOR_SIZE-1:0];
 
     integer i;
-
-    // Initialization
     integer s, q;
+	integer q_idx;
     always @(posedge clk or posedge reset) begin
         if (reset) begin
             // Initialize all occupancy vectors to 0
@@ -138,7 +131,7 @@ module optgen
         should_cache = 1;
 
         if (is_reuse) begin
-            integer q_idx;
+            
             q_idx = last_quanta;
             while (q_idx != curr_quanta) begin
                 if (occupancy_vector[set][q_idx] >= `DL1ways)
@@ -151,7 +144,7 @@ module optgen
     // Update occupancy vector if should_cache == 1
     always @(posedge clk) begin
         if (is_reuse && should_cache && !reset) begin
-            integer q_idx;
+            // integer q_idx;
             q_idx = last_quanta;
             while (q_idx != curr_quanta) begin
                 if (occupancy_vector[set][q_idx] < `DL1ways)
@@ -178,7 +171,7 @@ module hawkeye_predictor (
     function automatic [9:0] hash;
         input [63:0] pc;
         begin
-            hash = pc[9:0] ^ pc[19:10] ^ pc[29:20]; // simple XOR hash
+            hash = pc[9:0] ^ pc[19:10] ^ pc[29:20];
         end
     endfunction
 

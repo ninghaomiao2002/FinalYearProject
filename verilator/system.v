@@ -2,7 +2,7 @@
 `ifndef _SYSTEM_V_
 `define _SYSTEM_V_
 
-`define DEB 0
+`define DEB 1
 `define STDO 1
 
 `include "cpu.v"
@@ -13,6 +13,7 @@
 // `include "caches_new.v"
 // `include "caches_hawkeye.v"
 `include "hawkeye.v"
+// `include "reference.v"
 `include "custom.v"
 
 module System(clk, reset, StartAddress, StackPointer,      
